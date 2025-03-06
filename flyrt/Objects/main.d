@@ -37,4 +37,5 @@
 .\objects\main.o: .\Include\usart.h
 .\objects\main.o: C:\Program Files\Keil_v5\ARM\ARMCC\Bin\..\include\stdio.h
 .\objects\main.o: .\Include\delay.h
-.\objects\main.o: .\Include\tim.h
+.\objects\main.o: .\Include\bldc.h
+.\objects\main.o: .\Include\usart.h

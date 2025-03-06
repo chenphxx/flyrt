@@ -636,16 +636,6 @@
               <FilePath>.\Include\delay.h</FilePath>
             </File>
             <File>
-              <FileName>tim.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\Include\tim.c</FilePath>
-            </File>
-            <File>
-              <FileName>tim.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\Include\tim.h</FilePath>
-            </File>
-            <File>
               <FileName>usart.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\Include\usart.c</FilePath>
@@ -654,6 +644,16 @@
               <FileName>usart.h</FileName>
               <FileType>5</FileType>
               <FilePath>.\Include\usart.h</FilePath>
+            </File>
+            <File>
+              <FileName>bldc.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Include\bldc.h</FilePath>
+            </File>
+            <File>
+              <FileName>bldc.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Include\bldc.c</FilePath>
             </File>
           </Files>
         </Group>

@@ -1,16 +1,18 @@
 #include "stm32f4xx.h"
 #include "usart.h"
 #include "delay.h"
-#include "tim.h"
+#include "bldc.h"
 
 int main(void)
 {
+    usart1_init(9600);
     delay_init();
-	usart1_init(9600);
-	tim_init();
-    
+    tim2_init();
+
+    uint16_t command = 0;
+
     while (1)
     {
-		// pass
+        bldc_control(command);
     }
 }
