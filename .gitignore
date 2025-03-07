@@ -1,11 +1,11 @@
 # 忽略文件夹
-/serial-assisstant/build/
+
 
 # 忽略文件
 /serial-assisstant/serial-assisstant.pro.user
-/flyrt-keil/DebugConfig
-/flyrt-keil/Listings
-/flyrt-keil/Objects
-/flyrt-keil/flyrt.uvguix.chenphxx
-/flyrt-keil/flyrt.uvoptx
-/flyrt-keil/.vscode
+/flyrt/DebugConfig
+/flyrt/Listings
+/flyrt/Objects
+/flyrt/flyrt.uvguix.chenphxx
+/flyrt/flyrt.uvoptx
+/flyrt/.vscode
