@@ -1,7 +1,7 @@
-#include "stm32f4xx.h"
 #include "usart.h"
 #include "delay.h"
 #include "bldc.h"
+#include "mpu6050.h"
 
 int main(void)
 {
