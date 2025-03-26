@@ -180,10 +180,6 @@ void mpu6050_calibrate(void)
     float ax_offset_temp = 0, ay_offset_temp = 0, az_offset_temp = 0;
     float gx_offset_temp = 0, gy_offset_temp = 0, gz_offset_temp = 0;
 
-    // 零偏校准值
-    ax_offset = 0, ay_offset = 0, az_offset = 0;
-    gx_offset = 0, gy_offset = 0, gz_offset = 0;
-
     for (int i = 0; i < 100; i++)
     {
         mpu6050_get_cdata(&ax, &ay, &az, &gx, &gy, &gz);  // 获取加速度和角速度数据
