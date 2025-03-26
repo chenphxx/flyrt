@@ -117,6 +117,7 @@ void mpu6050_get_cdata(float *ax, float *ay, float *az, float *gx, float *gy, fl
  *        准确值 = 原始值 - 水平静置传感器收集100次数据的平均值; 
  *        当前并没有对Z轴进行校准 因为Z轴的数据大致等于1g 属于正确数据
  * 
+ * @param NULL
  * @return void
  */
 void mpu6050_calibrate(void);
