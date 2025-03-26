@@ -5,8 +5,8 @@
  * @details 配置MPU6050的通信与数据读取
  * 
  * @author chenphxx
- * @date 2025-3-24
- * @version V2025.3.24
+ * @date 2025-3-26
+ * @version V2025.3.26
  */
 #ifndef __MPU6050_H
 #define __MPU6050_H
