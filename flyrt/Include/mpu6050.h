@@ -3,15 +3,18 @@
  * @brief 姿态传感器文件
  * 
  * @details 配置MPU6050的通信与数据读取
+ *          可以读取加速度计与陀螺仪的原始数据 也可以读取转换后的数据
  * 
  * @author chenphxx
- * @date 2025-3-26
- * @version V2025.3.26
+ * @date 2025-4-1
+ * @version V2025.4.1
  */
 #ifndef __MPU6050_H
 #define __MPU6050_H
 
 #include "stm32f4xx.h"
+#include <math.h>
+#include <stdint.h>
 
 // 地址配置 
 #define MPU6050_SMPLRT_DIV 0x19
@@ -38,9 +41,26 @@
 #define MPU6050_PWR_MGMT_2 0x6C
 #define MPU6050_WHO_AM_I 0x75
 
+#ifndef PI
+#define PI 3.14159265358979323846
+#endif
+
 // 偏移量
 extern float ax_offset, ay_offset, az_offset;
 extern float gx_offset, gy_offset, gz_offset;
+
+extern float prev_roll;  // 上一时刻滚转角
+extern float prev_pitch;  // 上一时刻俯仰角
+extern const float alpha;  // 互补滤波增益因子
+
+// 四元数
+typedef struct
+{
+    float q0;  // 实部
+    float q1;  // 虚部X
+    float q2;  // 虚部Y
+    float q3;  // 虚部Z
+} quaternion;
 
 /**
  * @brief  MPU6050初始化
@@ -115,11 +135,31 @@ void mpu6050_get_cdata(float *ax, float *ay, float *az, float *gx, float *gy, fl
  * @brief 零偏校准器 获取校准后的加速度与角速度数据; 
  *        水平放置传感器 静止采集100次数据 取平均值; 
  *        准确值 = 原始值 - 水平静置传感器收集100次数据的平均值; 
- *        当前并没有对Z轴进行校准 因为Z轴的数据大致等于1g 属于正确数据
+ *        当前并没有对Z轴进行校准 因为Z轴的数据大致等于1g 属于正确数据 如有需要可以自行取消注释
  * 
- * @param NULL
  * @return void
  */
 void mpu6050_calibrate(void);
+                
+/**
+ * @brief 互补滤波器
+ * 
+ * @param ax 加速度计X轴数据
+ * @param ay 加速度计Y轴数据
+ * @param az 加速度计Z轴数据
+ * @param gx 陀螺仪X轴数据
+ * @param gy 陀螺仪Y轴数据
+ * @param gz 陀螺仪Z轴数据
+ * @return void
+ */
+void mpu6050_complementary_filter(float *ax, float *ay, float *az, float *gx, float *gy, float *gz);
+
+/**
+ * @brief 将姿态信息转换为四元数
+ * 
+ * @param NULL
+ * @void
+ */
+void mpu6050_quaternion(void);
 
 #endif

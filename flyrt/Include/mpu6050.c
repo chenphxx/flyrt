@@ -2,10 +2,6 @@
 
 #define MPU6050_ADDRESS 0xD0  // MPU6050的I2C从机地址
 
-// 零偏校准值
-float ax_offset = 0, ay_offset = 0, az_offset = 0;
-float gx_offset = 0, gy_offset = 0, gz_offset = 0;
-
 // MPU6050初始化
 void mpu6050_init(void)
 {
@@ -153,6 +149,10 @@ void mpu6050_get_odata(int16_t *acc_x, int16_t *acc_y, int16_t *acc_z, int16_t *
     *gyro_z = (data_h << 8) | data_l;
 }
 
+// 零偏校准值
+float ax_offset = 0, ay_offset = 0, az_offset = 0;
+float gx_offset = 0, gy_offset = 0, gz_offset = 0;
+
 // 获取加速度和角速度数据
 void mpu6050_get_cdata(float *ax, float *ay, float *az, float *gx, float *gy, float *gz)
 {
@@ -180,12 +180,16 @@ void mpu6050_calibrate(void)
     float ax_offset_temp = 0, ay_offset_temp = 0, az_offset_temp = 0;
     float gx_offset_temp = 0, gy_offset_temp = 0, gz_offset_temp = 0;
 
+    // 零偏校准值
+    ax_offset = 0, ay_offset = 0, az_offset = 0;
+    gx_offset = 0, gy_offset = 0, gz_offset = 0;
+
     for (int i = 0; i < 100; i++)
     {
         mpu6050_get_cdata(&ax, &ay, &az, &gx, &gy, &gz);  // 获取加速度和角速度数据
         ax_offset_temp += ax;  // 累加
         ay_offset_temp += ay;
-        // az_offset_temp += az;  // 由于重力加速度的存在 Z轴不做校准
+        // az_offset_temp += az;  // 由于重力加速度基本正确 Z轴不做校准
         gx_offset_temp += gx;
         gy_offset_temp += gy;
         gz_offset_temp += gz;
@@ -194,8 +198,35 @@ void mpu6050_calibrate(void)
     // // 计算偏移量
     ax_offset = ax_offset_temp / 100;
     ay_offset = ay_offset_temp / 100;
-    // az_offset = az_offset_temp / 100;  // 由于重力加速度的存在 Z轴不做校准
+    // az_offset = az_offset_temp / 100;
     gx_offset = gx_offset_temp / 100;
     gy_offset = gy_offset_temp / 100;
     gz_offset = gz_offset_temp / 100;
+}
+
+// 互补滤波器
+void mpu6050_complementary_filter(float *ax, float *ay, float *az, float *gx, float *gy, float *gz)
+{
+    float roll_acc, pitch_acc;  // 加速度计计算的滚转角和俯仰角
+    float roll_gyro, pitch_gyro;  // 陀螺仪计算的滚转角和俯仰角
+    float roll, pitch;  // 最终的滚转角和俯仰角
+    float dt = 0.01f;  // 假设采样周期为10ms，实际应用中你应该从定时器中获取
+
+    // 加速度计计算
+    pitch_acc = atan(*ay / sqrt((*ax) * (*ax) + (*az) * (*az)));  // 俯仰角
+    roll_acc = atan(*ax / sqrt((*ay) * (*ay) + (*az) * (*az)));   // 滚转角
+
+    // 转换为角度
+    pitch_acc = pitch_acc * 180.0f / PI;
+    roll_acc = roll_acc * 180.0f / PI;
+
+    // 陀螺仪计算
+
+    printf("pitch: %.2f° roll: %.2f°\r\n", pitch_acc, roll_acc);
+}
+
+// 四元数转换
+void mpu6050_quaternion(void)
+{
+
 }
