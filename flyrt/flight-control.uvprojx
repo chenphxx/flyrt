@@ -50,7 +50,7 @@
             <InvalidFlash>1</InvalidFlash>
           </TargetStatus>
           <OutputDirectory>.\Objects\</OutputDirectory>
-          <OutputName>flyrt</OutputName>
+          <OutputName>flight-control</OutputName>
           <CreateExecutable>1</CreateExecutable>
           <CreateLib>0</CreateLib>
           <CreateHexFile>1</CreateHexFile>
@@ -626,6 +626,16 @@
           <GroupName>Include</GroupName>
           <Files>
             <File>
+              <FileName>bldc.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Include\bldc.c</FilePath>
+            </File>
+            <File>
+              <FileName>bldc.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Include\bldc.h</FilePath>
+            </File>
+            <File>
               <FileName>delay.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\Include\delay.c</FilePath>
@@ -646,16 +656,6 @@
               <FilePath>.\Include\usart.h</FilePath>
             </File>
             <File>
-              <FileName>bldc.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>.\Include\bldc.h</FilePath>
-            </File>
-            <File>
-              <FileName>bldc.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>.\Include\bldc.c</FilePath>
-            </File>
-            <File>
               <FileName>mpu6050.c</FileName>
               <FileType>1</FileType>
               <FilePath>.\Include\mpu6050.c</FilePath>
@@ -664,6 +664,46 @@
               <FileName>mpu6050.h</FileName>
               <FileType>5</FileType>
               <FilePath>.\Include\mpu6050.h</FilePath>
+            </File>
+            <File>
+              <FileName>pid.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Include\pid.c</FilePath>
+            </File>
+            <File>
+              <FileName>pid.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Include\pid.h</FilePath>
+            </File>
+            <File>
+              <FileName>tool.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Include\tool.c</FilePath>
+            </File>
+            <File>
+              <FileName>tool.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Include\tool.h</FilePath>
+            </File>
+            <File>
+              <FileName>filter.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Include\filter.c</FilePath>
+            </File>
+            <File>
+              <FileName>filter.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Include\filter.h</FilePath>
+            </File>
+            <File>
+              <FileName>iic.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\Include\iic.c</FilePath>
+            </File>
+            <File>
+              <FileName>iic.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\Include\iic.h</FilePath>
             </File>
           </Files>
         </Group>

@@ -15,20 +15,36 @@
 
 #include "usart.h"
 
+#define PWM_MAX 2000
+#define PWM_MIN 1000
+
+extern uint16_t base_ccr;  // 占空比
+
 /**
  * @brief 通用定时器2初始化
  * 
  * @param NULL
  * @return void
  */
-void tim2_init();
+void tim2_init(void);
 
 /**
- * @brief 根据信号控制电机
+ * @brief 在开机时设定电机转速 需要接一个最小转速1000CCR
  * 
- * @param command 上位机发送的控制信号
+ * @param NULL
  * @return void
  */
-void bldc_control(uint16_t command);
+void bldc_init(void);
+
+/**
+ * @brief 调节四个电机的CCR
+ * 
+ * @param ccr1 电机1的CCR值
+ * @param ccr2 电机2的CCR值
+ * @param ccr3 电机3的CCR值
+ * @param ccr4 电机4的CCR值
+ * @return void
+ */
+void bldc_ccr(uint16_t ccr1, uint16_t ccr2, uint16_t ccr3, uint16_t ccr4);
 
 #endif

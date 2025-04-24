@@ -1,40 +1,130 @@
 #include "usart.h"
 #include "delay.h"
-#include "bldc.h"
 #include "mpu6050.h"
+#include "bldc.h"
+#include "pid.h"
+#include "tool.h"
+#include "filter.h"
 
-uint8_t id;
-// 原始数据
-int16_t ax_raw, ay_raw, az_raw, gx_raw, gy_raw, gz_raw;
-// 转换后加速度与角速度
-float ax, ay, az, gx, gy, gz;
-// 零偏校准值
-extern float ax_offset, ay_offset, az_offset, gx_offset, gy_offset, gz_offset;
+/**
+ * @brief 根据接收到的信号控制飞行器
+ * 
+ * @param NULL
+ * @return void
+ */
+void bldc_control(void);
+
+extern float ekf_roll_cor, ekf_pitch_cor;  // 扩展卡尔曼滤波 去除偏移量的值
+
+extern uint16_t base_ccr;  // 初始CCR值
+
+// CCR偏移量
+extern uint8_t offset_a;
+extern uint8_t offset_b;
+extern uint8_t offset_c;
+extern uint8_t offset_d;
+
+extern float angle_pitch;  // 目标pitch角度
+extern float angle_roll;  // 目标roll角度
 
 int main(void)
 {
-    mpu6050_init();  // 初始化MPU6050
     usart1_init(9600);
-    delay_init();
+    tim2_init();  // 初始化PWM
+    mpu6050_init(GPIOB, GPIO_Pin_6, GPIO_Pin_7);
 
-    id = mpu6050_get_id();  // 获取MPU6050ID
+	bldc_init();  // 将CCR置为2000 等待确定行程
+	
+    // 开始前校准坐标
+    printf("开始校准...请等待校准完成信号\r\n\r\n");
+	ekf_calibrate();  // 适用扩展卡尔曼滤波
+    printf("校准完成\r\n\r\n");
 
     while (1)
     {
-        mpu6050_get_cdata(&ax, &ay, &az, &gx, &gy, &gz);  // 获取加速度和角速度
-        printf("AX:%.2fm/s² AY:%.2fm/s² AZ:%.2fm/s²\r\nGX:%.2f°/s GY:%.2f°/s GZ:%.2f°/s\r\n\r\n", ax, ay, az, gx, gy, gz);
+        ekf_exec();  // 扩展卡尔曼滤波
+		bldc_control();  // 接收并处理控制信号
+        // attitude_control(ekf_pitch_cor, ekf_roll_cor, angle_pitch, angle_roll);
+    }
+}
 
-        mpu6050_complementary_filter(&ax, &ay, &az, &gx, &gy, &gz);  // 互补滤波
-
-        if (USART_ReceiveData(USART1) == '1')
+// 根据信号控制飞行器
+void bldc_control(void)
+{
+    uint16_t command = USART_ReceiveData(USART1);
+    if (command == '1')
+    {
+        if (base_ccr < 1100)
         {
-            printf("2s后开始校准...\r\n\r\n");
-            delay_ms(2000);
-            printf("开始校准...\r\n\r\n");
-            mpu6050_calibrate();  // 校准数据
-            printf("校准完成\r\n\r\n");
-            printf("当前偏移量为:AX:%.2f AY:%.2f AZ:%.2f GX:%.2f GY:%.2f GZ:%.2f\r\n\r\n", ax_offset, ay_offset, az_offset, gx_offset, gy_offset, gz_offset);
+            base_ccr = 1100;
+            printf("不能小于1100\r\n");
         }
-        delay_ms(500);
+        base_ccr += 1;
+        bldc_ccr(base_ccr, base_ccr, base_ccr, base_ccr);  // 调节电机的CCR值
+        printf("%d %d %d %d\n", TIM2->CCR1, TIM2->CCR2, TIM2->CCR3, TIM2->CCR4);
+    }
+    else if (command == '2')
+    {
+        if (base_ccr < 1100)
+        {
+            base_ccr = 1100;
+            printf("不能小于1100\r\n");
+        }
+        base_ccr -= 1;
+        bldc_ccr(base_ccr, base_ccr, base_ccr, base_ccr);
+        printf("%d %d %d %d\n", TIM2->CCR1, TIM2->CCR2, TIM2->CCR3, TIM2->CCR4);
+    }
+    else if (command == '3')  // 重置CCR offset base_ccr
+    {
+        TIM2->CCR1 = PWM_MIN;
+        TIM2->CCR2 = PWM_MIN;
+        TIM2->CCR3 = PWM_MIN;
+        TIM2->CCR4 = PWM_MIN;
+        offset_a = 0;
+        offset_b = 0;
+        offset_c = 0;
+        offset_d = 0;
+        base_ccr = 1000;
+        printf("%d %d %d %d\n", TIM2->CCR1, TIM2->CCR2, TIM2->CCR3, TIM2->CCR4);
+    }
+	// 控制飞行器飞行
+    else if (command == '4')  // 悬空
+    {
+        angle_pitch = 0.0f;
+        angle_roll = 0.0f;
+        attitude_control(ekf_pitch_cor, ekf_roll_cor, angle_pitch, angle_roll);
+    }
+    else if (command == '5')  // 前进
+    {
+        angle_pitch = -5.0f;
+        angle_roll = 0.0f;
+        attitude_control(ekf_pitch_cor, ekf_roll_cor, angle_pitch, angle_roll);
+    }
+    else if (command == '6')  // 后退
+    {
+        angle_pitch = 5.0f;
+        angle_roll = 0.0f;
+        attitude_control(ekf_pitch_cor, ekf_roll_cor, angle_pitch, angle_roll);
+    }
+    else if (command == '7')  // 向左
+    {
+        angle_pitch = 0.0f;
+        angle_roll = 5.0f;
+        attitude_control(ekf_pitch_cor, ekf_roll_cor, angle_pitch, angle_roll);
+    }
+    else if (command == '8')  // 向右
+    {
+        angle_pitch = 0.0f;
+        angle_roll = -5.0f;
+        attitude_control(ekf_pitch_cor, ekf_roll_cor, angle_pitch, angle_roll);
+    }
+    else if (command == '9')  // 获取当前角度数据
+    {
+        printf("%.2f, %.2f\r\n", ekf_roll_cor, ekf_pitch_cor);
+    }
+    else if (command == '0')
+    {
+        bldc_ccr(base_ccr, base_ccr, base_ccr, base_ccr);
+        printf("%d %d %d %d\n", TIM2->CCR1, TIM2->CCR2, TIM2->CCR3, TIM2->CCR4);
     }
 }

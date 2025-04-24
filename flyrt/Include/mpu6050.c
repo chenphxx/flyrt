@@ -1,232 +1,190 @@
 #include "mpu6050.h"
 
-#define MPU6050_ADDRESS 0xD0  // MPU6050的I2C从机地址
+I2C_BUS MPU6050_I2C;
 
-// MPU6050初始化
-void mpu6050_init(void)
+typedef enum
 {
-    RCC_APB1PeriphClockCmd(RCC_APB1Periph_I2C1, ENABLE);
-    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB, ENABLE);
+    Band_256Hz = 0x00,
+    Band_186Hz,
+    Band_96Hz,
+    Band_43Hz,
+    Band_21Hz,
+    Band_10Hz,
+    Band_5Hz
+} Filter_Typedef;
 
-    GPIO_InitTypeDef GPIO_InitStructure;
-    GPIO_InitStructure.GPIO_Pin = GPIO_Pin_6 | GPIO_Pin_7;
-    GPIO_InitStructure.GPIO_Mode = GPIO_Mode_AF;  // 设置为复用功能
-    GPIO_InitStructure.GPIO_Speed = GPIO_Speed_50MHz;  // 设置IO口速度为50MHz
-    GPIO_InitStructure.GPIO_OType = GPIO_OType_OD;  // 设置为开漏输出
-    GPIO_InitStructure.GPIO_PuPd = GPIO_PuPd_UP;  // 设置为上拉
-    GPIO_Init(GPIOB, &GPIO_InitStructure);
+typedef enum
+{
+    gyro_250 = 0x00,
+    gyro_500 = 0x08,
+    gyro_1000 = 0x10,
+    gyro_2000 = 0x18
+} GYRO_CONFIG_Typedef;
 
-    // 引脚复用
-    GPIO_PinAFConfig(GPIOB, GPIO_PinSource6, GPIO_AF_I2C1);
-    GPIO_PinAFConfig(GPIOB, GPIO_PinSource7, GPIO_AF_I2C1);
+typedef enum
+{
+    acc_2g = 0x00,
+    acc_4g = 0x08,
+    acc_8g = 0x10,
+    acc_16g = 0x18
+} ACCEL_CONFIG_Typedef;
 
-    I2C_InitTypeDef I2C_InitStructure;
-    I2C_InitStructure.I2C_Mode = I2C_Mode_I2C;  // I2C模式
-    I2C_InitStructure.I2C_ClockSpeed = 50000;  // 设置时钟速度为50KHz
-    I2C_InitStructure.I2C_DutyCycle = I2C_DutyCycle_2;  // 设置时钟占空比
-    I2C_InitStructure.I2C_Ack = I2C_Ack_Enable;  // 启用应答
-    I2C_InitStructure.I2C_AcknowledgedAddress = I2C_AcknowledgedAddress_7bit;  // 设置7位地址
-    I2C_InitStructure.I2C_OwnAddress1 = 0x00;  // 自身地址（从机模式下有效）
-    I2C_Init(I2C1, &I2C_InitStructure);
+typedef enum
+{
+    FIFO_Disable,
+    Acc_OUT = 0x08,
+    Gyro_zOUT = 0x10,
+    Gyro_yOUT = 0x20,
+    Gyro_xOUT = 0x40,
+    Temp_OUT = 0x80,
+} FIFO_EN_Typedef;
 
-    I2C_Cmd(I2C1, ENABLE);
+typedef enum
+{
+    interrupt_Disable,
+    Data_Ready_EN = 0x01,
+    I2C_Master_EN = 0x08,
+    FIFO_overFolow_EN = 0x10,
+    Motion_EN = 0x40,
+} INT_EN_Typedef;
 
-    mpu6050_write_reg(MPU6050_PWR_MGMT_1, 0x01);  // 电源管理寄存器1 取消睡眠模式 选择时钟源为X轴陀螺仪
-    mpu6050_write_reg(MPU6050_PWR_MGMT_2, 0x00);  // 电源管理寄存器2 保持默认值0 所有轴均不待机
-    mpu6050_write_reg(MPU6050_SMPLRT_DIV, 0x09);  // 采样率分频寄存器 配置采样率
-    mpu6050_write_reg(MPU6050_CONFIG, 0x06);  // 配置寄存器，配置DLPF
+typedef struct MPU6050_InitTypeDef
+{
+    uint16_t SMPLRT_Rate;
+    Filter_Typedef Filter;
+    GYRO_CONFIG_Typedef gyro_range;
+    ACCEL_CONFIG_Typedef acc_range;
+    FIFO_EN_Typedef FIFO_EN;
+    INT_EN_Typedef INT;
+} MPU6050_InitTypeDef;
 
-    // 配置陀螺仪与加速度计的量程
-    mpu6050_write_reg(MPU6050_GYRO_CONFIG, 0x08);  // 陀螺仪量程±500°/s
-    mpu6050_write_reg(MPU6050_ACCEL_CONFIG, 0x08);  // 加速度计量程±4g
+static void mpu6050_register_init(MPU6050_InitTypeDef *this)
+{
+    I2C(MPU6050_I2C)->Write_Reg(MPU6050_PWR_MGMT_1, 0x80);  // 复位
+
+    delay_ms(100);
+    I2C(MPU6050_I2C)->Write_Reg(MPU6050_PWR_MGMT_1, 0x00);  // 唤醒
+    uint8_t SMPLRT_DIV;
+    if (this->SMPLRT_Rate > 1000)
+        this->SMPLRT_Rate = 1000;
+    else if (this->SMPLRT_Rate < 4)
+        this->SMPLRT_Rate = 4;
+    SMPLRT_DIV = 1000 / this->SMPLRT_Rate - 1;  // 由计算公式得
+
+    I2C(MPU6050_I2C)->Write_Reg(MPU6050_SMPLRT_DIV, SMPLRT_DIV);
+    I2C(MPU6050_I2C)->Write_Reg(MPU6050_INT_ENABLE, this->INT);
+    I2C(MPU6050_I2C)->Write_Reg(MPU6050_CONFIG, this->Filter);
+    I2C(MPU6050_I2C)->Write_Reg(MPU6050_GYRO_CONFIG, this->gyro_range);
+    I2C(MPU6050_I2C)->Write_Reg(MPU6050_ACCEL_CONFIG, this->acc_range);
+    I2C(MPU6050_I2C)->Write_Reg(MPU6050_FIFO_EN, this->FIFO_EN);
+
+    uint8_t temp = 0x00;
+    if (this->FIFO_EN != 0x00)  // 如果打开了FIFO
+        temp = 0x40;
+    if ((this->INT & 0x08) == 1)  // 如果打开了中断
+        temp |= 0x08;
+    I2C(MPU6050_I2C)->Write_Reg(MPU6050_USER_CTRL, temp);
+    I2C(MPU6050_I2C)->Write_Reg(MPU6050_PWR_MGMT_1, 0x01);  // X轴为参考
 }
 
-// 等待事件
-void mpu6050_wait_event(I2C_TypeDef *i2cx, uint32_t i2c_event)
+uint8_t mpu6050_id(void)
 {
-    uint32_t timeout;
-    timeout = 10000;  // 给定超时计数时间
-    while (I2C_CheckEvent(i2cx, i2c_event) != SUCCESS)  // 循环等待指定事件
-    {
-        timeout--;  // 等待时，计数值自减
-        if (timeout == 0)  // 自减到0后，等待超时
-        {
-            /*超时的错误处理代码，可以添加到此处*/
-            break;  // 跳出等待，不等了
-        }
-    }
+    return I2C(MPU6050_I2C)->Read_Reg(MPU6050_WHO_AM_I);
 }
 
-// 写寄存器
-void mpu6050_write_reg(uint8_t reg_address, uint8_t data)
+void mpu6050_init(GPIO_TypeDef *GPIOx, uint16_t SCl, uint16_t SDA)
 {
-    I2C_GenerateSTART(I2C1, ENABLE);  // 硬件I2C生成起始条件
-    mpu6050_wait_event(I2C1, I2C_EVENT_MASTER_MODE_SELECT);  // 等待EV5
+    MPU6050_I2C = Create_SI2C(GPIOx, SCl, SDA, MPU6050_ADDRESS << 1);
 
-    I2C_Send7bitAddress(I2C1, MPU6050_ADDRESS, I2C_Direction_Transmitter);  // 硬件I2C发送从机地址，方向为发送
-    mpu6050_wait_event(I2C1, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED);  // 等待EV6
+    MPU6050_InitTypeDef MPU6050_init_Struct;
+    MPU6050_init_Struct.SMPLRT_Rate = 500;  // 采样率Hz
+    MPU6050_init_Struct.Filter = Band_5Hz;  // 低通滤波器带宽
+    MPU6050_init_Struct.gyro_range = gyro_2000;  // 陀螺仪测量范围
+    MPU6050_init_Struct.acc_range = acc_16g;  // 加速度计测量范围
+    MPU6050_init_Struct.FIFO_EN = FIFO_Disable;  // FIFO
+    MPU6050_init_Struct.INT = interrupt_Disable;  // 中断配置
 
-    I2C_SendData(I2C1, reg_address);  // 硬件I2C发送寄存器地址
-    mpu6050_wait_event(I2C1, I2C_EVENT_MASTER_BYTE_TRANSMITTING);  // 等待EV8
-
-    I2C_SendData(I2C1, data);  // 硬件I2C发送数据
-    mpu6050_wait_event(I2C1, I2C_EVENT_MASTER_BYTE_TRANSMITTED);  // 等待EV8_2
-
-    I2C_GenerateSTOP(I2C1, ENABLE);  // 硬件I2C生成终止条件
+    mpu6050_register_init(&MPU6050_init_Struct); // 初始化寄存器
 }
 
-// 读寄存器
-uint8_t mpu6050_read_reg(uint8_t reg_address)
+void mpu6050_get_raw(MPU6050_Raw *this)
 {
-    uint8_t data;
-
-    I2C_GenerateSTART(I2C1, ENABLE);  // 硬件I2C生成起始条件
-    mpu6050_wait_event(I2C1, I2C_EVENT_MASTER_MODE_SELECT);  // 等待EV5
-
-    I2C_Send7bitAddress(I2C1, MPU6050_ADDRESS, I2C_Direction_Transmitter);  // 硬件I2C发送从机地址，方向为发送
-    mpu6050_wait_event(I2C1, I2C_EVENT_MASTER_TRANSMITTER_MODE_SELECTED);  // 等待EV6
-
-    I2C_SendData(I2C1, reg_address);  // 硬件I2C发送寄存器地址
-    mpu6050_wait_event(I2C1, I2C_EVENT_MASTER_BYTE_TRANSMITTED);  // 等待EV8_2
-
-    I2C_GenerateSTART(I2C1, ENABLE);  // 硬件I2C生成重复起始条件
-    mpu6050_wait_event(I2C1, I2C_EVENT_MASTER_MODE_SELECT);  // 等待EV5
-
-    I2C_Send7bitAddress(I2C1, MPU6050_ADDRESS, I2C_Direction_Receiver);  // 硬件I2C发送从机地址，方向为接收
-    mpu6050_wait_event(I2C1, I2C_EVENT_MASTER_RECEIVER_MODE_SELECTED);  // 等待EV6
-
-    I2C_AcknowledgeConfig(I2C1, DISABLE);  // 在接收最后一个字节之前提前将应答失能
-    I2C_GenerateSTOP(I2C1, ENABLE);  // 在接收最后一个字节之前提前申请停止条件
-
-    mpu6050_wait_event(I2C1, I2C_EVENT_MASTER_BYTE_RECEIVED);  // 等待EV7
-    data = I2C_ReceiveData(I2C1);  // 接收数据寄存器
-
-    I2C_AcknowledgeConfig(I2C1, ENABLE);  // 将应答恢复为使能 为了不影响后续可能产生的读取多字节操作
-
-    return data;
+    this->AccX = ((int16_t)(I2C(MPU6050_I2C)->Read_Reg(MPU6050_ACCEL_XOUT_H)) << 8) | I2C(MPU6050_I2C)->Read_Reg(MPU6050_ACCEL_XOUT_L);
+    this->AccY = ((int16_t)(I2C(MPU6050_I2C)->Read_Reg(MPU6050_ACCEL_YOUT_H)) << 8) | I2C(MPU6050_I2C)->Read_Reg(MPU6050_ACCEL_YOUT_L);
+    this->AccZ = ((int16_t)(I2C(MPU6050_I2C)->Read_Reg(MPU6050_ACCEL_ZOUT_H)) << 8) | I2C(MPU6050_I2C)->Read_Reg(MPU6050_ACCEL_ZOUT_L);
+    this->GyroX = ((int16_t)(I2C(MPU6050_I2C)->Read_Reg(MPU6050_GYRO_XOUT_H)) << 8) | I2C(MPU6050_I2C)->Read_Reg(MPU6050_GYRO_XOUT_L);
+    this->GyroX = ((int16_t)(I2C(MPU6050_I2C)->Read_Reg(MPU6050_GYRO_YOUT_H)) << 8) | I2C(MPU6050_I2C)->Read_Reg(MPU6050_GYRO_YOUT_L);
+    this->GyroX = ((int16_t)(I2C(MPU6050_I2C)->Read_Reg(MPU6050_GYRO_ZOUT_H)) << 8) | I2C(MPU6050_I2C)->Read_Reg(MPU6050_GYRO_ZOUT_L);
+    this->Temp = ((uint16_t)(I2C(MPU6050_I2C)->Read_Reg(MPU6050_TEMP_OUT_H)) << 8) | I2C(MPU6050_I2C)->Read_Reg(MPU6050_TEMP_OUT_L);
 }
 
-// 获取ID号
-uint8_t mpu6050_get_id(void)
+float roll_offset = 0, pitch_offset = 0;
+
+void mpu6050_get_angle(MPU6050 *this)
 {
-    // 返回WHO_AM_I寄存器的值
-    return mpu6050_read_reg(MPU6050_WHO_AM_I);
+    int16_t temp = 0;
+    float Ax, Ay, Az = 0;
+    float Gx, Gy, Gz = 0;
+
+    static float Gyroscope_roll = 0;  // 陀螺仪积分roll
+    static float Gyroscope_pitch = 0;  // 陀螺仪积分pitch
+    const static float dt = 0.005;  // 采样间隔
+    const static float weight = 0.95;  // 互补滤波权重
+
+    temp = ((uint16_t)I2C(MPU6050_I2C)->Read_Reg(MPU6050_ACCEL_XOUT_H) << 8) + I2C(MPU6050_I2C)->Read_Reg(MPU6050_ACCEL_XOUT_L);
+    Ax = temp * 16.0 / 32768;
+
+    temp = ((uint16_t)I2C(MPU6050_I2C)->Read_Reg(MPU6050_ACCEL_YOUT_H) << 8) + I2C(MPU6050_I2C)->Read_Reg(MPU6050_ACCEL_YOUT_L);
+    Ay = temp * 16.0 / 32768;
+
+    temp = ((uint16_t)I2C(MPU6050_I2C)->Read_Reg(MPU6050_ACCEL_ZOUT_H) << 8) + I2C(MPU6050_I2C)->Read_Reg(MPU6050_ACCEL_ZOUT_L);
+    Az = temp * 16.0 / 32768;
+
+    temp = ((uint16_t)I2C(MPU6050_I2C)->Read_Reg(MPU6050_GYRO_XOUT_H) << 8) + I2C(MPU6050_I2C)->Read_Reg(MPU6050_GYRO_XOUT_L);
+    Gx = temp * dt * 0.0174533;
+
+    temp = ((uint16_t)I2C(MPU6050_I2C)->Read_Reg(MPU6050_GYRO_YOUT_H) << 8) + I2C(MPU6050_I2C)->Read_Reg(MPU6050_GYRO_YOUT_L);
+    Gy = temp * dt * 0.0174533;
+
+    temp = ((uint16_t)I2C(MPU6050_I2C)->Read_Reg(MPU6050_GYRO_ZOUT_H) << 8) + I2C(MPU6050_I2C)->Read_Reg(MPU6050_GYRO_ZOUT_L);
+    Gz = temp * dt * 0.0174533;
+
+    // 互补滤波
+    Gyroscope_roll += Gy;
+    Gyroscope_pitch += Gx;
+    // this->roll = weight * atan2(Ay, Az) / 3.1415926 * 180 + (1 - weight) * Gyroscope_roll - roll_offset;
+    // this->pitch = -(weight * atan2(Ax, Az) / 3.1415926 * 180 + (1 - weight) * Gyroscope_pitch) - pitch_offset;
+    // this->yaw += Gz * 20 + 0.0157;  // 减小零飘
+
+    // 仅使用加速度计数据计算角度数据 不使用互补滤波 互补滤波会导致角度数据随着时间漂移
+    this->roll = atan2(Ay, Az) / 3.1415926 * 180 - roll_offset;
+    this->pitch = -(atan2(Ax, Az) / 3.1415926 * 180) - pitch_offset;
 }
 
-// 读取原始数据数据
-void mpu6050_get_odata(int16_t *acc_x, int16_t *acc_y, int16_t *acc_z, int16_t *gyro_x, int16_t *gyro_y, int16_t *gyro_z)
-{
-    uint8_t data_h, data_l;  // 定义数据高8位和低8位的变量
-
-    // 加速度计X轴
-    data_h = mpu6050_read_reg(MPU6050_ACCEL_XOUT_H);  // 读取加速度计X轴的高8位数据
-    data_l = mpu6050_read_reg(MPU6050_ACCEL_XOUT_L);  // 读取加速度计X轴的低8位数据
-    *acc_x = (data_h << 8) | data_l;  // 数据拼接，通过输出参数返回
-
-    // 加速度计Y轴
-    data_h = mpu6050_read_reg(MPU6050_ACCEL_YOUT_H);
-    data_l = mpu6050_read_reg(MPU6050_ACCEL_YOUT_L);
-    *acc_y = (data_h << 8) | data_l;
-
-    // 加速度计Z轴
-    data_h = mpu6050_read_reg(MPU6050_ACCEL_ZOUT_H);
-    data_l = mpu6050_read_reg(MPU6050_ACCEL_ZOUT_L);
-    *acc_z = (data_h << 8) | data_l;
-
-    // 陀螺仪X轴
-    data_h = mpu6050_read_reg(MPU6050_GYRO_XOUT_H);
-    data_l = mpu6050_read_reg(MPU6050_GYRO_XOUT_L);
-    *gyro_x = (data_h << 8) | data_l;
-
-    // 陀螺仪Y轴
-    data_h = mpu6050_read_reg(MPU6050_GYRO_YOUT_H);
-    data_l = mpu6050_read_reg(MPU6050_GYRO_YOUT_L);
-    *gyro_y = (data_h << 8) | data_l;
-
-    // 陀螺仪Z轴
-    data_h = mpu6050_read_reg(MPU6050_GYRO_ZOUT_H);
-    data_l = mpu6050_read_reg(MPU6050_GYRO_ZOUT_L);
-    *gyro_z = (data_h << 8) | data_l;
-}
-
-// 零偏校准值
-float ax_offset = 0, ay_offset = 0, az_offset = 0;
-float gx_offset = 0, gy_offset = 0, gz_offset = 0;
-
-// 获取加速度和角速度数据
-void mpu6050_get_cdata(float *ax, float *ay, float *az, float *gx, float *gy, float *gz)
-{
-    int16_t ax_raw, ay_raw, az_raw, gx_raw, gy_raw, gz_raw;
-    // 读取原始数据
-    mpu6050_get_odata(&ax_raw, &ay_raw, &az_raw, &gx_raw, &gy_raw, &gz_raw);
-
-    // 加速度计转换 量程 ±4g 8192 LSB/g
-    *ax = ((float)ax_raw / 8192.0f) * 9.81f - ax_offset;
-    *ay = ((float)ay_raw / 8192.0f) * 9.81f - ay_offset;
-    *az = ((float)az_raw / 8192.0f) * 9.81f - az_offset;
-
-    // 陀螺仪转换 量程 ±500°/s 65.5 LSB/(°/s)
-    *gx = gx_raw / 65.5f - gx_offset;
-    *gy = gy_raw / 65.5f - gy_offset;
-    *gz = gz_raw / 65.5f - gz_offset;
-}
-
-// 零偏校准器
+// 校准角度 添加偏移量
 void mpu6050_calibrate(void)
 {
-    float ax, ay, az, gx, gy, gz;  // 未校准的加速度和角速度
-
     // 临时偏移量
-    float ax_offset_temp = 0, ay_offset_temp = 0, az_offset_temp = 0;
-    float gx_offset_temp = 0, gy_offset_temp = 0, gz_offset_temp = 0;
+    float roll_offset_temp = 0, pitch_offset_temp = 0;
 
-    // 零偏校准值
-    ax_offset = 0, ay_offset = 0, az_offset = 0;
-    gx_offset = 0, gy_offset = 0, gz_offset = 0;
+    MPU6050 temp;
 
-    for (int i = 0; i < 100; i++)
+    for (int i = 0; i < 200; i++)
     {
-        mpu6050_get_cdata(&ax, &ay, &az, &gx, &gy, &gz);  // 获取加速度和角速度数据
-        ax_offset_temp += ax;  // 累加
-        ay_offset_temp += ay;
-        // az_offset_temp += az;  // 由于重力加速度基本正确 Z轴不做校准
-        gx_offset_temp += gx;
-        gy_offset_temp += gy;
-        gz_offset_temp += gz;
+        mpu6050_get_angle(&temp);
+        roll_offset_temp += temp.roll;
+        pitch_offset_temp += temp.pitch;
+        // delay_ms(1);
     }
-
-    // // 计算偏移量
-    ax_offset = ax_offset_temp / 100;
-    ay_offset = ay_offset_temp / 100;
-    // az_offset = az_offset_temp / 100;
-    gx_offset = gx_offset_temp / 100;
-    gy_offset = gy_offset_temp / 100;
-    gz_offset = gz_offset_temp / 100;
+    roll_offset = roll_offset_temp / 200;
+    pitch_offset = pitch_offset_temp / 200;
 }
 
-// 互补滤波器
-void mpu6050_complementary_filter(float *ax, float *ay, float *az, float *gx, float *gy, float *gz)
+// 获取转换后的温度数据
+float mpu6050_get_temp(void)
 {
-    float roll_acc, pitch_acc;  // 加速度计计算的滚转角和俯仰角
-    float roll_gyro, pitch_gyro;  // 陀螺仪计算的滚转角和俯仰角
-    float roll, pitch;  // 最终的滚转角和俯仰角
-    float dt = 0.01f;  // 假设采样周期为10ms，实际应用中你应该从定时器中获取
+    uint8_t temp = (((uint16_t)I2C(MPU6050_I2C)->Read_Reg(MPU6050_TEMP_OUT_H)) << 8) | I2C(MPU6050_I2C)->Read_Reg(MPU6050_TEMP_OUT_L);
+    float temperature = (float)temp / 340 + 36.53;
 
-    // 加速度计计算
-    pitch_acc = atan(*ay / sqrt((*ax) * (*ax) + (*az) * (*az)));  // 俯仰角
-    roll_acc = atan(*ax / sqrt((*ay) * (*ay) + (*az) * (*az)));   // 滚转角
-
-    // 转换为角度
-    pitch_acc = pitch_acc * 180.0f / PI;
-    roll_acc = roll_acc * 180.0f / PI;
-
-    // 陀螺仪计算
-
-    printf("pitch: %.2f° roll: %.2f°\r\n", pitch_acc, roll_acc);
-}
-
-// 四元数转换
-void mpu6050_quaternion(void)
-{
-
+    return temperature;
 }

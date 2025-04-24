@@ -1,31 +1,43 @@
 #include "delay.h"
 
-// 使用基本定时器实现延时
-void delay_init(void)
+// 延时 100ns，使用 TIM2 定时器进行精确计时
+void delay_100ns(uint32_t n)
 {
-    RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM6, ENABLE);  // 使能TIM6时钟
-    RCC->APB1ENR |= RCC_APB1ENR_TIM6EN;
-    TIM6->PSC = 84 - 1;  // 预分频系数 84M/(84-1+1)=1M 每秒计数1M次 即1us计数一次
-    TIM6->ARR = 65536 - 1;  // 自动重装载值 即计数到65535后重新计数
-    TIM6->CR1 |= TIM_CR1_CEN; // 启动定时器
-}
-
-// 微秒级延时函数
-void delay_us(uint32_t time)
-{
-    TIM6->CNT = 0; // 计数器清零
-    // 确保时间不超过 ARR
-    if (time <= 65535)
+    // 使用 TIM2 计时器，假设 TIM2 时钟频率为 180 MHz (适应 STM32F4)
+    TIM_SetCounter(TIM2, 0);
+    while (n > 0)
     {
-        while (TIM6->CNT < time); // 循环直到计数器达到设定时间
+        while (TIM_GetCounter(TIM2) < 1)
+            ; // 等待定时器计数器值达到 1
+        TIM_SetCounter(TIM2, 0);
+        n--;
     }
 }
 
-void delay_ms(uint32_t time)
+// 微秒延时
+void delay_us(uint32_t us)
 {
-    // 直接使用delay_us来实现毫秒级延时
-    while (time--)
-    {
+    if (us == 0)
+        return;
+    // STM32F4 系列的 SysTick 使用 168MHz 系统时钟
+    SysTick->LOAD = 168 * us - 1;  // 设置负载值
+    SysTick->VAL = 0x00;  // 清空计数器
+    SysTick->CTRL = 0x00000005;  // 启动 SysTick 使用系统时钟 启用计数器
+    while (!(SysTick->CTRL & 0x00010000))  // 等待计时结束
+        ;
+    SysTick->CTRL = 0x00000004;  // 禁用 SysTick
+}
+
+// 毫秒延时
+void delay_ms(uint32_t xms)
+{
+    while (xms--)
         delay_us(1000);
-    }
+}
+
+// 秒级延时
+void delay_s(uint32_t xs)
+{
+    while (xs--)
+        delay_ms(1000);
 }

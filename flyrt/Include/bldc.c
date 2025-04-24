@@ -35,7 +35,7 @@ void tim2_init(void)
     TIM_OCInitTypeDef TIM_OCInitStructure;
     TIM_OCInitStructure.TIM_OCMode = TIM_OCMode_PWM1;  // PWM模式1
     TIM_OCInitStructure.TIM_OutputState = TIM_OutputState_Enable;  // 输出使能
-    TIM_OCInitStructure.TIM_Pulse = 1000;  // CCR1 调节占空比 范围5%-11% 1000-2200
+    // TIM_OCInitStructure.TIM_Pulse = 1000;  // CCR1 调节占空比 范围5%-10% 1000-2000
     TIM_OCInitStructure.TIM_OCPolarity = TIM_OCPolarity_High;  // 输出极性
 
     // 初始化定时器通道
@@ -51,87 +51,32 @@ void tim2_init(void)
     TIM_OC4PreloadConfig(TIM2, TIM_OCPreload_Enable);
     // 关闭预装载寄存器
     // TIM_OC1PreloadConfig(TIM2, TIM_OCPreload_Disable);
+    // TIM_OC2PreloadConfig(TIM2, TIM_OCPreload_Disable);
+    // TIM_OC3PreloadConfig(TIM2, TIM_OCPreload_Disable);
+    // TIM_OC4PreloadConfig(TIM2, TIM_OCPreload_Disable);
 }
 
-// 根据信号控制电机
-void bldc_control(uint16_t command)
-{
-    if (USART_GetFlagStatus(USART1, USART_FLAG_RXNE) != RESET)  // 检测是否有数据
-    {
-        command = USART_ReceiveData(USART1);
-        // CCR1
-        if (command == '1')  // 增加占空比 每次增加0.1%
-        {
-            if (TIM2->CCR1 + 20 <= TIM2->ARR)
-            {
-                TIM2->CCR1 += 20;
-            }
-        }
-        else if (command == '2')  // 减小占空比 每次减少0.1%
-        {
-            if (TIM2->CCR1 >= 1000)
-            {
-                TIM2->CCR1 -= 20;
-            }
-        }
-        // CCR2
-        else if (command == '3')
-        {
-            if (TIM2->CCR2 + 20 <= TIM2->ARR)
-            {
-                TIM2->CCR2 += 20;
-            } 
-        }
-        else if (command == '4')
-        {
-            if (TIM2->CCR2 >= 1000)
-            {
-                TIM2->CCR2 -= 20;
-            }
-        }
-        // CCR3
-        else if (command == '5')
-        {
-            if (TIM2->CCR3 + 20 <= TIM2->ARR)
-            {
-                TIM2->CCR3 += 20;
-            } 
-        }
-        else if (command == '6')
-        {
-            if (TIM2->CCR3 >= 1000)
-            {
-                TIM2->CCR3 -= 20;
-            }
-        }
-        // CCR4
-        else if (command == '7')
-        {
-            if (TIM2->CCR4 + 20 <= TIM2->ARR)
-            {
-                TIM2->CCR4 += 20;
-            } 
-        }
-        else if (command == '8')
-        {
-            if (TIM2->CCR4 >= 1000)
-            {
-                TIM2->CCR4 -= 20;
-            }
-        }
-        // 复位占空比 恢复5%占空比
-        else if (command == '5')
-        {
-            TIM2->CCR1 = 1000;
-            TIM2->CCR2 = 1000;
-            TIM2->CCR3 = 1000;
-            TIM2->CCR4 = 1000;
-        }
+uint16_t base_ccr = 0;  // 基准CCR值
 
-        printf("%.1f%% %.1f%% %.1f%% %.1f%%\n", 
-                (float)TIM2->CCR1 / (TIM2->ARR + 1) * 100, 
-                (float)TIM2->CCR2 / (TIM2->ARR + 1) * 100,
-                (float)TIM2->CCR3 / (TIM2->ARR + 1) * 100,
-                (float)TIM2->CCR4 / (TIM2->ARR + 1) * 100);
-    }
+// 开机时激活电调
+void bldc_init(void)
+{
+    TIM2->CCR1 = PWM_MAX;
+    TIM2->CCR2 = PWM_MAX;
+    TIM2->CCR3 = PWM_MAX;
+    TIM2->CCR4 = PWM_MAX;
+}
+
+uint8_t offset_a = 0;
+uint8_t offset_b = 0;
+uint8_t offset_c = 0;
+uint8_t offset_d = 0;
+
+// 根据信号控制电机
+void bldc_ccr(uint16_t ccr1, uint16_t ccr2, uint16_t ccr3, uint16_t ccr4)
+{
+    TIM2->CCR1 = ccr1;
+    TIM2->CCR2 = ccr2;
+    TIM2->CCR3 = ccr3;
+    TIM2->CCR4 = ccr4;
 }
