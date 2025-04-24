@@ -6,7 +6,9 @@
 
 #define SI2C_delay_time 0  // 设置硬件I2C的延时速度
 #define I2C(obj)	(Pthis = &obj)  // Pthis全局指针宏定义
+
 typedef struct I2C_Private I2C_Private;
+
 typedef struct I2C_BUS
 {
     // 严禁使用该指针

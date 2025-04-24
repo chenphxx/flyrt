@@ -49,11 +49,6 @@ void tim2_init(void)
     TIM_OC2PreloadConfig(TIM2, TIM_OCPreload_Enable);
     TIM_OC3PreloadConfig(TIM2, TIM_OCPreload_Enable);
     TIM_OC4PreloadConfig(TIM2, TIM_OCPreload_Enable);
-    // 关闭预装载寄存器
-    // TIM_OC1PreloadConfig(TIM2, TIM_OCPreload_Disable);
-    // TIM_OC2PreloadConfig(TIM2, TIM_OCPreload_Disable);
-    // TIM_OC3PreloadConfig(TIM2, TIM_OCPreload_Disable);
-    // TIM_OC4PreloadConfig(TIM2, TIM_OCPreload_Disable);
 }
 
 uint16_t base_ccr = 0;  // 基准CCR值

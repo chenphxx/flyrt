@@ -13,22 +13,22 @@ typedef struct I2C_Private
     uint8_t Hard_I2C_EN;
 } I2C_Private;
 
-//PB6->SCL
-#define RCC_IIC_SCL 	RCC_AHB1Periph_GPIOB	//端口时钟
-#define IIC_SCL_PORT	GPIOB					//端口
-#define IIC_SCL			GPIO_Pin_6				//引脚
+// PB6 SCL
+#define RCC_IIC_SCL 	RCC_AHB1Periph_GPIOB  //端口时钟
+#define IIC_SCL_PORT	GPIOB  //端口
+#define IIC_SCL			GPIO_Pin_6  //引脚
 
-//PB7->SDA
-#define RCC_IIC_SDA		RCC_AHB1Periph_GPIOB	//端口时钟
-#define IIC_SDA_PORT	GPIOB					//端口
-#define IIC_SDA			GPIO_Pin_7				//引脚
+// PB7 SDA
+#define RCC_IIC_SDA		RCC_AHB1Periph_GPIOB  //端口时钟
+#define IIC_SDA_PORT	GPIOB  //端口
+#define IIC_SDA			GPIO_Pin_7  //引脚
 
-//IO操作
+// IO操作
 #define IIC_SCL_H		GPIO_SetBits(IIC_SCL_PORT, IIC_SCL)
 #define IIC_SCL_L		GPIO_ResetBits(IIC_SCL_PORT, IIC_SCL)
 #define IIC_SDA_H		GPIO_SetBits(IIC_SDA_PORT, IIC_SDA)
 #define IIC_SDA_L		GPIO_ResetBits(IIC_SDA_PORT, IIC_SDA)
-#define READ_SDA		(IIC_SDA_PORT->IDR&IIC_SDA) ? 1 : 0	//输入SDA
+#define READ_SDA		(IIC_SDA_PORT->IDR&IIC_SDA) ? 1 : 0  //输入SDA
 
 void MyI2C_W_SCL(uint8_t BitValue)
 {
