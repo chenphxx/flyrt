@@ -1,11 +1,22 @@
 # 忽略文件夹
 
-
-# 忽略文件
-/serial-assisstant/serial-assisstant.pro.user
+# Keil MDK 编译输出
 /flyrt/DebugConfig
 /flyrt/Listings
 /flyrt/Objects
-/flyrt/flyrt-control.uvguix.chenphxx
-/flyrt/flyrt-control.uvoptx
+
+# VS Code 及其 Keil 插件配置与日志
 /flyrt/.vscode
+
+# 忽略文件
+
+# Keil MDK 用户配置
+*.uvguix.*
+*.uvoptx
+
+# Keil MDK 临时文件
+*.bak
+*.dep
+
+# Qt Creator 用户配置
+/serial-assisstant/serial-assisstant.pro.user
