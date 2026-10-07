@@ -20,3 +20,6 @@
 
 # Qt Creator 用户配置
 /serial-assisstant/serial-assisstant.pro.user
+
+# todo
+todo.md
